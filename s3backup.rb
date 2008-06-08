@@ -87,7 +87,7 @@ p ARGV
 
 config = Configure.new(options[:file_cfg])
 
-#s3db = S3SyncDb.new
+s3db = S3SyncDb.new(config.current)
 #s3b = S3Backup.new(ARGV.shift)
 #s3b.bak(ARGV)
 #s3db.aggiornaS3
