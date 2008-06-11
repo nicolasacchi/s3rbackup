@@ -42,6 +42,10 @@ class OptS3rquery
 			opts.on("-o", "--output-dir DIR", String, "When get or unpack this specifies the output directory") do |name|
 				options[:out_dir] = name
 			end
+	
+			opts.on("--last", "When get or unpack this specifies the output directory") do |name|
+				options[:last] = true
+			end
 			#opts.on("-s", "--nosync-db", "Don't sync local db with remote") do |s|
 			#	options[:nosync] = s
 			#end
@@ -87,21 +91,24 @@ case command
 		results = s3db.find(ARGV)
 		results.each do |ret|
 			puts "Downloading of #{ret["aws_name"]}"
-			s3db.get(ret["aws_name"], ret["bucket"], ret["aws_name"])
+			s3db.get(ret, ret["aws_name"])
 		end
 	when 'unpack'
 		#estrai nella dir
 		results = s3db.find(ARGV)
 		results.each do |ret|
 			puts "Unpacking of #{ret["aws_name"]}"
-			s3db.unpack(ret["aws_name"], ret["bucket"], options[:out_dir])
+			s3db.unpack(ret, options[:out_dir])
 		end
 	when 'delete'
 		#cancella
+		results = s3db.find(ARGV)
+		results.each do |ret|
+			puts "Deleting of #{ret["aws_name"]}"
+			s3db.delete(ret)
+		end
+		s3db.salva_db
 	else
 		puts "Some error occurred command #{command} not valid"
 end
 
-
-#s3db.bak(ARGV,  options[:name],  options[:descr])
-#s3db.salva_db

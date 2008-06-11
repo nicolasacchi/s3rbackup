@@ -94,6 +94,8 @@ class S3SyncDb
 		doc["host"] = `hostname`.gsub("\n","").to_s
 		doc["user"] = `whoami`.gsub("\n","").to_s
 		doc["size"] = File.size(tf.path)
+		doc["compression"] = "bz2"
+		doc["archive"] = "tar"
 		@db << doc
 		aws_name = "#{doc["name"]}_#{`date +%Y%m%d_%H.%M.%S`}_#{@db.find_index(doc)}".gsub("\n","")
 		doc["aws_name"] = aws_name
@@ -106,6 +108,8 @@ class S3SyncDb
 		obj.metadata[:descrizione] = doc["description"]
 		obj.metadata[:current_path] = doc["current_path"]
 		obj.metadata[:size] = doc["size"]
+		obj.metadata[:compression] = doc["compression"]
+		obj.metadata[:archive] = doc["archive"]
 		obj.store
 		obj.about.each do |key,val|
 			doc[key] = val
@@ -149,19 +153,25 @@ class S3SyncDb
 		return results
 	end
 
-	def get(aws_name, bucket, out_name, out_dir = nil)
+	def get(item, out_name, out_dir = nil)
+		aws_name = item["aws_name"]
+		bucket = item["bucket"]
+		ext = (item["archive"] and item["archive"] != "" ? ".#{item["archive"]}" : "")
+		ext += (item["compression"] and item["compression"] != "" ? ".#{item["compression"]}" : "")
 		if out_dir
 			`mkdir -p #{out_dir}` if out_dir.end_with?("/")
 			out_name = "#{out_dir}#{out_name}"
 		end
-		open("#{out_name}.tar.bz2", 'w') do |file|
+		open("#{out_name}#{ext}", 'w') do |file|
 			S3Object.stream(aws_name, bucket) do |chunk|
 				file.write chunk
 			end
 		end
 	end
 
-	def unpack(aws_name, bucket, out_name = nil)
+	def unpack(item, out_name = nil)
+		aws_name = item["aws_name"]
+		bucket = item["bucket"]
 		tf = Tempfile.new("s3unbackup")
 		open(tf.path, 'w') do |file|
 			S3Object.stream(aws_name, bucket) do |chunk|
@@ -170,14 +180,16 @@ class S3SyncDb
 		end
 		if out_name
 			`mkdir -p #{out_name}`
-			`cd out_name`
-			tar = `tar xfj #{tf.path}`
-			`cd -`
+			tar = `tar --directory #{out_name} -xjf #{tf.path}`
 		else
 			tar = `tar xfj #{tf.path}`
 		end
 	end
 
+	def delete(item)
+		S3Object.delete item["aws_name"], item["bucket"]
+		@db.delete(item)
+	end
 end
 
 class Configure
