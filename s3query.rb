@@ -13,7 +13,7 @@ class OptS3rquery
 	def self.parse(args)
 		options = {}
 		opts = OptionParser.new do |opts|
-			opts.banner = "Usage: s3query.rb [options] command <parameters> (parameters can be name=test or simply test)"
+			opts.banner = "Usage: s3query.rb [options] <search|get|unpack|delete> <parameters> (parameters can be name=test or simply test)"
 		
 			opts.on("-s", "search words", String, "Search something") do |name|
 				options[:op] = "search"
@@ -43,9 +43,22 @@ class OptS3rquery
 				options[:out_dir] = name
 			end
 	
-			opts.on("--last", "When get or unpack this specifies the output directory") do |name|
+			opts.on("--newer", "Get only the newest item, with the same name") do |name|
+				options[:newer] = true
+			end
+	
+			opts.on("--older", "Get only the oldest item, with the same name") do |name|
+				options[:older] = true
+			end
+	
+			opts.on("--last", "Get only the newest item (only one result)") do |name|
 				options[:last] = true
 			end
+	
+			opts.on("--first", "Get only the oldest item (only one result)") do |name|
+				options[:first] = true
+			end
+
 			#opts.on("-s", "--nosync-db", "Don't sync local db with remote") do |s|
 			#	options[:nosync] = s
 			#end
@@ -60,6 +73,18 @@ class OptS3rquery
 	end
 end
 
+def get_last(res)
+	ret = []
+	ret << res[res.nitems - 1] if res.nitems > 0
+	ret
+end
+
+def get_first(res)
+	ret = []
+	ret << res[0] if res.nitems > 0
+	ret
+end
+
 options = OptS3rquery.parse(ARGV)
 #p options
 #in argv rimane tutto il resto
@@ -71,10 +96,12 @@ config.current["bucket"] = options[:bucket] if options[:bucket]
 s3db = S3SyncDb.new(config.current)
 
 command = ARGV.shift
+results = s3db.find(ARGV, nil, options)
+results = get_last(results) if options[:last]
+results = get_first(results) if options[:first]
 case command
 	when 'search'
 		#cerca
-		results = s3db.find(ARGV)
 		results.each do |ret|
 			if options[:cols]
 				outp = []
@@ -88,21 +115,18 @@ case command
 		end
 	when 'get'
 		#scarica
-		results = s3db.find(ARGV)
 		results.each do |ret|
 			puts "Downloading of #{ret["aws_name"]}"
 			s3db.get(ret, ret["aws_name"])
 		end
 	when 'unpack'
 		#estrai nella dir
-		results = s3db.find(ARGV)
 		results.each do |ret|
 			puts "Unpacking of #{ret["aws_name"]}"
 			s3db.unpack(ret, options[:out_dir])
 		end
 	when 'delete'
 		#cancella
-		results = s3db.find(ARGV)
 		results.each do |ret|
 			puts "Deleting of #{ret["aws_name"]}"
 			s3db.delete(ret)

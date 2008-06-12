@@ -13,7 +13,7 @@ class S3SyncDb
 
 		@config = config
 		@db_file = config["db_file"]
-		@db_file = "#{ENV['HOME']}/.s3backup/s3db.yml" if !@db_file
+		@db_file = "#{ENV['HOME']}/.s3rbackup/s3db.yml" if !@db_file
 		@db_file_ver = "#{@db_file}.ver"
 		#apro il db
 		if !File.exists?(@db_file)
@@ -82,7 +82,7 @@ class S3SyncDb
 	def bak(dirs, name, descr)
 		crea_bucket(@config["bucket"])
 		name = dirs[0] if !name
-		tf = Tempfile.new("s3backup")
+		tf = Tempfile.new("s3rbackup")
 		tar = `tar -c #{dirs.join(" ")} | bzip2 -9 > #{tf.path}`
 		
 		doc = {}
@@ -114,15 +114,11 @@ class S3SyncDb
 		obj.about.each do |key,val|
 			doc[key] = val
 		end
-
-		#doc[:about] = obj.about
-		#doc += obj.about
-		p obj.metadata
 		#TODO aggiungere check
 		#TODO aggiornare db
 	end
 
-	def find(words, bucket = nil)
+	def find(words, bucket = nil, cmd_opt = {})
 		option = {}
 		words_search = []
 		words.each do |word|
@@ -133,8 +129,6 @@ class S3SyncDb
 				words_search << word
 			end
 		end
-		#p option
-		#p words_search
 		results = []
 		@db.each do |item|
 			option.each do |key,val|
@@ -143,13 +137,33 @@ class S3SyncDb
 				end
 			end
 			words_search.each do |word|
-				#p item.values.join(" ")
 				if item.values.join(" ") =~ /.*#{word}.*/
 					results << item
 				end
 			end
 		end
 		results.uniq!
+		hres = {}
+		if cmd_opt[:newer] or cmd_opt[:older]
+			results.each do |item|
+				results.each do |item2|
+					if item["name"] == item2["name"]
+						hres[item["name"]] ||= []
+						hres[item["name"]] << item
+						#hres[:name].sort! {|x,y| x["date"] <=> y["date"]}
+					end
+				end
+			end
+			results = []
+			#p hres
+			hres.each do |key,val|
+				val.sort! {|x,y| x["date"] <=> y["date"]}
+				results << val[val.nitems - 1] if cmd_opt[:newer]
+				results << val[0] if cmd_opt[:older]
+			end
+		end
+		results.sort! {|x,y| x["date"] <=> y["date"]}
+
 		return results
 	end
 
@@ -172,7 +186,7 @@ class S3SyncDb
 	def unpack(item, out_name = nil)
 		aws_name = item["aws_name"]
 		bucket = item["bucket"]
-		tf = Tempfile.new("s3unbackup")
+		tf = Tempfile.new("s3runbackup")
 		open(tf.path, 'w') do |file|
 			S3Object.stream(aws_name, bucket) do |chunk|
 				file.write chunk
@@ -194,8 +208,8 @@ end
 
 class Configure
 	attr_reader :current
-	def initialize(file_name = "#{ENV['HOME']}/.s3backup/config.yml")
-		file_name = "#{ENV['HOME']}/.s3backup/config.yml" if !file_name
+	def initialize(file_name = "#{ENV['HOME']}/.s3rbackup/config.yml")
+		file_name = "#{ENV['HOME']}/.s3rbackup/config.yml" if !file_name
 		@current = YAML::load(File.open(file_name))
 	end
 end

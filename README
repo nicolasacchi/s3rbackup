@@ -1,0 +1,48 @@
+- s3rbackup
+It's a backup system based on amazon s3 backend.
+
+- Features
+One command to backup a directory, one command to retrieve.
+Compressed file on S3, transparent compression/decompression on local system.
+Local database with metadata of every file, database can be also automatically
+saved to S3.
+Query to database for file searching.
+
+- Configure
+You need a file called ~/.s3rbackup/config.yml in your home directory with:
+
+	access_key_id: your_amazon_access_key
+	secret_access_key: your_secret_access_key
+	bucket: your_default_bucket (can be changed in command line)
+	sync_db: false	(true if local db must be sync with remote S3 db)
+	bucket_db: your_database_bucket (if sync_db is true)
+
+- How work
+There are three file:
+	s3rbackup.rb	script for backup
+	s3query.rb script for quering the database
+	s3dbsync.rb library
+
+* s3rbackup.rb
+To backup a directory:
+	s3rbackup.rb test_dir/
+To backup a directory with a backup name and a description:
+	s3rbackup.rb -n "backup name" -d "backup description" test_dir/
+You can add multiple directory to a single backup:
+	s3rbackup.rb -n "backup name" -d "backup description" test_dir/ test_dir1/ test_dir2/
+
+* s3query.rb
+To query your database and get backup files it's based on command:
+	s3query.rb [options] <search|get|unpack|delete> parameters
+
+To search a word on database:
+	s3query.rb search test
+To search a only by name on database:
+	s3query.rb search name=test
+to get all file that match name=test:
+	s3query.rb get name=test
+to get and extract all file that match name=test
+	s3query.rb unpack name=test
+to get and extract only the lastest version of all file that match name=test
+	s3query.rb unpack name=test --newer
+In similar way you can use delete.
