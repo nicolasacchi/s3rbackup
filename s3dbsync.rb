@@ -19,30 +19,56 @@ class S3SyncDb
 		if !File.exists?(@db_file)
 			#download db
 			begin
-				buck_db = Bucket.find(config.bucket_db)
+				buck_db = Bucket.find(config["bucket_db"])
 			rescue
 				#devo crearlo
 				if config["sync_db"]
-					Bucket.create(config.bucket_db)
+					Bucket.create(config["bucket_db"])
 				end
 				@db = []
 				@version = 0
 				return
 			end
 			#lo copio in locale
-		  db_file = S3Object.find('s3rbackup_yaml_db', config.bucket_db)
+		  db_file = S3Object.find('s3rbackup_yaml_db', config["bucket_db"])
 			open(@db_file, 'w') do |file|
-				db_file.stream do |chunk|
+				S3Object.stream('s3rbackup_yaml_db', config["bucket_db"]) do |chunk|
 					file.write chunk
 		    end
 		  end
-			@version = db_file[:version].to_i
+			@version = db_file.metadata[:version].to_i
+			File.open(@db_file_ver, 'w') { |f| f.puts @version.to_s }
+		elsif config["sync_db"]
+			begin
+				buck_db = Bucket.find(config["bucket_db"])
+				db_file = S3Object.find('s3rbackup_yaml_db', config["bucket_db"])
+			rescue
+				#devo crearlo
+				if config["sync_db"]
+					Bucket.create(config["bucket_db"])
+				end
+				@db = YAML::load(File.open(@db_file))
+				@version ||= File.read(@db_file_ver).to_i
+				return
+			end
+			#se esiste e devo fare il sync
+			@version = db_file.metadata[:version].to_i
+			local_ver = File.read(@db_file_ver)
+			if @version > local_ver.to_i
+				#uso il remoto
+				open(@db_file, 'w') do |file|
+					db_file.stream do |chunk|
+						file.write chunk
+			    end
+			  end
+				File.open(@db_file_ver, 'w') { |f| f.puts @version.to_s }
+			else
+				#posso usare quello locale
+			end
 		end
 		#lo carico
 		@db = YAML::load(File.open(@db_file))
-		if !@version and config["sync_db"]
-			#devo controllare le due versioni...
-		end
+		@version ||= File.read(@db_file_ver).to_i
 	end
 
 	def salva_locale
@@ -55,15 +81,16 @@ class S3SyncDb
 	end
 
 	def aggiornaS3
-		nuova_versione
 		salva_locale()
 		S3Object.store("s3rbackup_yaml_db", open(@db_file, "r"), @config["bucket_db"])
 		db_file = S3Object.find('s3rbackup_yaml_db', @config["bucket_db"])
-		db_file[:version] = @version.to_s
+		db_file.metadata[:version] = @version.to_s
+		db_file.store
 	end
 
 	def salva_db
 		salva_locale()
+		nuova_versione()
 		aggiornaS3() if @config["sync_db"]
 	end
 
