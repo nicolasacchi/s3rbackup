@@ -1,8 +1,5 @@
 require 'rubygems'
-require 'aws/s3'
-require 'tempfile'
 require 'optparse'
-require 'yaml'
 
 # always look "here" for include files (thanks aktxyz)
 $LOAD_PATH << File.expand_path(File.dirname(__FILE__)) 
@@ -59,6 +56,13 @@ class OptS3rquery
 				options[:first] = true
 			end
 
+			opts.on("--per-bucket", "Get results grouped per bucket") do |name|
+				options[:first] = true
+			end
+
+			opts.on("--size", "Get size") do |name|
+				options[:first] = true
+			end
 			#opts.on("-s", "--nosync-db", "Don't sync local db with remote") do |s|
 			#	options[:nosync] = s
 			#end
@@ -132,6 +136,15 @@ case command
 			s3db.delete(ret)
 		end
 		s3db.salva_db
+	when 'stats'
+		bucks_s = {}
+		results.each do |ret|
+			bucks_s[ret["bucket"]] ||= 0
+			bucks_s[ret["bucket"]] += ret["size"]
+		end
+		bucks_s.each do |key,val|
+			puts "#{key}:\t#{sprintf("%.2fMb", val / (1024.0 * 1024.0))}"
+		end
 	else
 		puts "Some error occurred command #{command} not valid"
 end

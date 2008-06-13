@@ -1,9 +1,5 @@
 require 'rubygems'
-require 'aws/s3'
-require 'tempfile'
-#require 'active_record'
 require 'optparse'
-require 'yaml'
 
 # always look "here" for include files (thanks aktxyz)
 $LOAD_PATH << File.expand_path(File.dirname(__FILE__)) 

@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'aws/s3'
 require 'tempfile'
-#require 'active_record'
+require 'yaml'
 
 class S3SyncDb
 	include AWS::S3
@@ -240,4 +240,3 @@ class Configure
 		@current = YAML::load(File.open(file_name))
 	end
 end
-
