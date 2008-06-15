@@ -43,8 +43,10 @@ To query your database and get backup files it's based on command:
 
 To search a word on database:
 	s3query.rb search test
-To search a only by name on database:
+To search file only by name on database:
 	s3query.rb search name=test
+To search only file bigger than 1Mb on database:
+	s3query.rb search size>1000000
 to get all file that match name=test:
 	s3query.rb get name=test
 to get and extract all file that match name=test
