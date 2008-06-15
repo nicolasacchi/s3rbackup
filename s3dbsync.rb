@@ -140,16 +140,34 @@ class S3SyncDb
 		doc["aws_name"] = aws_name
 		#FIXME Controllare che in db venga salvato aws_name
 
-		store = S3Object.store(aws_name, open(tf.path), @config["bucket"])
+		metadata = {}
+		metadata[:host] = doc["host"]
+		metadata[:user] = doc["user"]
+		metadata[:descrizione] = doc["description"]
+		metadata[:current_path] = doc["current_path"]
+		metadata[:size] = doc["size"]
+		metadata[:compression] = doc["compression"]
+		metadata[:archive] = doc["archive"]
+
+  # Store it!
+		options = {}
+		#options[:access] = :public_read if @public
+		options["x-amz-meta-host"] = doc["host"]
+		options["x-amz-meta-user"] = doc["user"]
+		options["x-amz-meta-descrizione"] = doc["description"]
+		options["x-amz-meta-current_path"] = doc["current_path"]
+		options["x-amz-meta-size"] = doc["size"]
+		options["x-amz-meta-compression"] = doc["compression"]
+		options["x-amz-meta-archive"] = doc["archive"]
+
+
+	#       options["x-amz-meta-sha1_hash"] = `sha1sum #{file}`.split[0] if @save_hash
+	#         options["x-amz-meta-mtime"] = fstat.mtime.getutc.to_i if @save_time
+	#           options["x-amz-meta-size"] = fstat.size if @save_size
+
+		store = S3Object.store(aws_name, open(tf.path), @config["bucket"], options)
 		obj = S3Object.find(aws_name, @config["bucket"])
-		obj.metadata[:host] = doc["host"]
-		obj.metadata[:user] = doc["user"]
-		obj.metadata[:descrizione] = doc["description"]
-		obj.metadata[:current_path] = doc["current_path"]
-		obj.metadata[:size] = doc["size"]
-		obj.metadata[:compression] = doc["compression"]
-		obj.metadata[:archive] = doc["archive"]
-		obj.store
+		#obj.store
 		obj.about.each do |key,val|
 			doc[key] = val
 		end
@@ -161,18 +179,56 @@ class S3SyncDb
 		option = {}
 		words_search = []
 		words.each do |word|
-			if word =~ /.*=.*/
-				#opzione
-				option[word.split("=")[0]] = word.split("=")[1]
-			else
-				words_search << word
+			case word 
+				when /.*=.*/
+					#opzione
+					option["="] ||= {}
+					option["="][word.split("=")[0]] = word.split("=")[1]
+				when /.*>.*/
+					#opzione
+					option[">"] ||= {}
+					option[">"][word.split(">")[0]] = word.split(">")[1]
+				when /.*<.*/
+					#opzione
+					option["<"] ||= {}
+					option["<"][word.split("<")[0]] = word.split("<")[1]
+				else
+					words_search << word
 			end
 		end
 		results = []
 		@db.each do |item|
-			option.each do |key,val|
-				if item[key] =~ /#{val}/
-					results << item
+			option.each do |key,opts|
+				opts.each do |campo,val|
+					case key
+						when "="
+							case item[campo].class.to_s
+								when "Time"
+									results << item if item[campo] = Time.parse(val) 
+								when "Fixnum"
+									results << item if item[campo] = val.to_i
+								else
+									results << item if item[campo] =~ /.*#{val}.*/
+							end
+						when "<"
+							case item[campo].class.to_s
+								when "Time"
+									results << item if item[campo] < Time.parse(val) 
+								when "Fixnum"
+									results << item if item[campo] < val.to_i
+								else
+									results << item if item[campo] < val
+							end
+						when ">"
+							case item[campo].class.to_s
+								when "Time"
+									results << item if item[campo] > Time.parse(val) 
+								when "Fixnum"
+									results << item if item[campo] > val.to_i
+								else
+									results << item if item[campo] > val
+							end
+					end
 				end
 			end
 			words_search.each do |word|
