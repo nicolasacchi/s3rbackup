@@ -122,8 +122,14 @@ class S3SyncDb
 		crea_bucket()
 		name = dirs[0] if !name
 		tf = Tempfile.new("s3rbackup")
-		tar = `tar -c #{dirs.join(" ")} | bzip2 -9 > #{tf.path}`
-		
+		tf_l = Tempfile.new("s3rbackup-listfile")
+		tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | bzip2 -9 > #{tf.path}`
+
+		filez = []
+		File.open(tf_l.path, 'r').each_line do |fh|
+    	filez << fh
+		end
+
 		doc = {}
 		doc["name"] = name
 		doc["bucket"] = @config["bucket"]
@@ -135,19 +141,11 @@ class S3SyncDb
 		doc["size"] = File.size(tf.path)
 		doc["compression"] = "bz2"
 		doc["archive"] = "tar"
+		doc["files"] = filez.join("")
 		@db << doc
 		aws_name = "#{doc["name"]}_#{`date +%Y%m%d_%H.%M.%S`}_#{@db.find_index(doc)}".gsub("\n","")
 		doc["aws_name"] = aws_name
 		#FIXME Controllare che in db venga salvato aws_name
-
-		metadata = {}
-		metadata[:host] = doc["host"]
-		metadata[:user] = doc["user"]
-		metadata[:descrizione] = doc["description"]
-		metadata[:current_path] = doc["current_path"]
-		metadata[:size] = doc["size"]
-		metadata[:compression] = doc["compression"]
-		metadata[:archive] = doc["archive"]
 
   # Store it!
 		options = {}
@@ -159,6 +157,7 @@ class S3SyncDb
 		options["x-amz-meta-size"] = doc["size"]
 		options["x-amz-meta-compression"] = doc["compression"]
 		options["x-amz-meta-archive"] = doc["archive"]
+		#options["x-amz-meta-files"] = doc["files"]
 
 
 	#       options["x-amz-meta-sha1_hash"] = `sha1sum #{file}`.split[0] if @save_hash
