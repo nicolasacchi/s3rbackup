@@ -1,9 +1,9 @@
 Gem::Specification.new do |s|
   s.name = "s3rbackup"
-  s.version = "0.1.0"
+  s.version = "0.2.0"
   s.date = "2008-06-13"
   s.summary = "Simple backup on Amazon S3"
-  s.email = "sacchi.nicola+s3rbackup@gmail.com"
+  s.email = "sacchi.nicola@gmail.com"
   s.homepage = "http://github.com/niky81/s3rbackup"
   s.description = "s3rbackup is a command line program for backing and restore group of directory or file in s3, it ships with integrated database for search in backup data."
   s.has_rdoc = false

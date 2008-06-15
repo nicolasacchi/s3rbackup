@@ -32,6 +32,18 @@ class OptS3rbackup
 				options[:nosync] = s
 			end
 		
+			opts.on("--log", "Log enabled") do |name|
+				options[:log] = true
+			end
+		
+			opts.on("--nolog", "Log disabled") do |name|
+				options[:log] = false
+			end
+
+			opts.on("--bucket-log", String, "Bucket log NAME") do |name|
+				options[:bucket_log] = name
+			end
+
 			opts.on_tail("-h", "--help", "Show this message") do
 				puts opts
 				exit
@@ -49,6 +61,8 @@ options = OptS3rbackup.parse(ARGV)
 
 config = Configure.new(options[:file_cfg])
 config.current["bucket"] = options[:bucket] if options[:bucket]
+config.current["log"] = options[:log] if options[:log] != nil
+config.current["bucket_log"] = options[:bucket_log] if options[:bucket_log]
 s3db = S3SyncDb.new(config.current)
 s3db.bak(ARGV,  options[:name],  options[:descr])
 s3db.salva_db

@@ -94,20 +94,32 @@ class S3SyncDb
 		aggiornaS3() if @config["sync_db"]
 	end
 
-	def crea_bucket(bucket)
+	def crea_bucket()
 		#find bucket
-		@bucket = bucket
+		@bucket = @config["bucket"]
+		@bucket_log = @config["bucket_log"] ? @config["bucket_log"] : "#{@bucket}-logs"
 		begin
-			bbackup = Bucket.find(bucket)
+			bbackup = Bucket.find(@bucket)
 		rescue
-			if !Bucket.create(bucket)
-				raise "Can't create bucket:#{bucket}"
+			if !Bucket.create(@bucket)
+				raise "Can't create bucket:#{@bucket}"
 			end
+		end
+		if @config["log"]
+			begin
+				blog = Bucket.find(@bucket_log)
+			rescue
+				Bucket.create(@bucket_log)
+			end
+			Bucket.enable_logging_for(
+				@bucket, 'target_bucket' => @bucket_log)
+		else
+			Bucket.disable_logging_for(@bucket) 
 		end
 	end	
 
 	def bak(dirs, name, descr)
-		crea_bucket(@config["bucket"])
+		crea_bucket()
 		name = dirs[0] if !name
 		tf = Tempfile.new("s3rbackup")
 		tar = `tar -c #{dirs.join(" ")} | bzip2 -9 > #{tf.path}`
@@ -167,6 +179,12 @@ class S3SyncDb
 				if item.values.join(" ") =~ /.*#{word}.*/
 					results << item
 				end
+			end
+		end
+		#caso in cui voglio tutto
+		if words.nitems == 0
+			@db.each do |item|
+				results << item
 			end
 		end
 		results.uniq!
@@ -230,6 +248,10 @@ class S3SyncDb
 	def delete(item)
 		S3Object.delete item["aws_name"], item["bucket"]
 		@db.delete(item)
+	end
+
+	def log()
+		return Bucket.logs(@config["bucket_log"])
 	end
 end
 

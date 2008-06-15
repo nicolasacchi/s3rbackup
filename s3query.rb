@@ -10,7 +10,7 @@ class OptS3rquery
 	def self.parse(args)
 		options = {}
 		opts = OptionParser.new do |opts|
-			opts.banner = "Usage: s3query.rb [options] <search|get|unpack|delete> <parameters> (parameters can be name=test or simply test)"
+			opts.banner = "Usage: s3query.rb [options] <search|get|unpack|delete|stats|logs> <parameters> (parameters can be name=test or simply test)"
 		
 			opts.on("-s", "search words", String, "Search something") do |name|
 				options[:op] = "search"
@@ -63,10 +63,19 @@ class OptS3rquery
 			opts.on("--size", "Get size") do |name|
 				options[:first] = true
 			end
-			#opts.on("-s", "--nosync-db", "Don't sync local db with remote") do |s|
-			#	options[:nosync] = s
-			#end
+	
+			opts.on("--log", "Log enabled") do |name|
+				options[:log] = true
+			end
 		
+			opts.on("--nolog", "Log disabled") do |name|
+				options[:log] = false
+			end
+
+			opts.on("--bucket-log", String, "Bucket log NAME") do |name|
+				options[:bucket_log] = name
+			end
+	
 			opts.on_tail("-h", "--help", "Show this message") do
 				puts opts
 				exit
@@ -90,9 +99,6 @@ def get_first(res)
 end
 
 options = OptS3rquery.parse(ARGV)
-#p options
-#in argv rimane tutto il resto
-#p ARGV
 
 config = Configure.new(options[:file_cfg])
 config.current["bucket"] = options[:bucket] if options[:bucket]
@@ -100,9 +106,14 @@ config.current["bucket"] = options[:bucket] if options[:bucket]
 s3db = S3SyncDb.new(config.current)
 
 command = ARGV.shift
-results = s3db.find(ARGV, nil, options)
-results = get_last(results) if options[:last]
-results = get_first(results) if options[:first]
+case command
+	when /[search|get|unpack|delete|stats]/
+		results = s3db.find(ARGV, nil, options)
+		results = get_last(results) if options[:last]
+		results = get_first(results) if options[:first]
+	when 'logs'
+		sub_cmd = ARGV.shift
+end
 case command
 	when 'search'
 		#cerca
@@ -137,6 +148,7 @@ case command
 		end
 		s3db.salva_db
 	when 'stats'
+		#get size
 		bucks_s = {}
 		results.each do |ret|
 			bucks_s[ret["bucket"]] ||= 0
@@ -145,6 +157,16 @@ case command
 		bucks_s.each do |key,val|
 			puts "#{key}:\t#{sprintf("%.2fMb", val / (1024.0 * 1024.0))}"
 		end
+	when 'logs'
+		case sub_cmd
+			when 'get'
+				logs = s3db.logs()
+				logs.each do |log|
+					p log
+				end
+			when 'delete'
+		end
+		#get logs bucket
 	else
 		puts "Some error occurred command #{command} not valid"
 end

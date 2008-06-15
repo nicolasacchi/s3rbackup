@@ -16,6 +16,9 @@ You need a file called ~/.s3rbackup/config.yml in your home directory with:
 	bucket: your_default_bucket (can be changed in command line)
 	sync_db: false	(true if local db must be sync with remote S3 db)
 	bucket_db: your_database_bucket (if sync_db is true)
+	bucket_log: s3rbackup_nik_log (if you want to specify where to log)
+	log: true (if you want logging)
+
 
 - How work
 There are three file:
