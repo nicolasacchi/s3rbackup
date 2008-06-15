@@ -62,6 +62,10 @@ class OptS3rquery
 				options[:first] = true
 			end
 
+			opts.on("--detail", "Detailed output (stats)") do |name|
+				options[:detail] = true
+			end
+	
 			opts.on("--size", "Get size") do |name|
 				options[:first] = true
 			end
@@ -152,12 +156,18 @@ case command
 	when 'stats'
 		#get size
 		bucks_s = {}
-		results.each do |ret|
-			bucks_s[ret["bucket"]] ||= 0
-			bucks_s[ret["bucket"]] += ret["size"]
-		end
-		bucks_s.each do |key,val|
-			puts "#{key}:\t#{sprintf("%.2fMb", val / (1024.0 * 1024.0))}"
+		if options[:detail]
+			results.each do |ret|
+				puts "#{ret["name"]}\t#{sprintf("%.2fMb", ret["size"].to_i / (1024.0 * 1024.0))}"
+			end
+		else
+			results.each do |ret|
+				bucks_s[ret["bucket"]] ||= 0
+				bucks_s[ret["bucket"]] += ret["size"]
+			end
+			bucks_s.each do |key,val|
+				puts "#{key}:\t#{sprintf("%.2fMb", val / (1024.0 * 1024.0))}"
+			end
 		end
 	when 'logs'
 		case sub_cmd

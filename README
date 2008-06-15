@@ -8,6 +8,9 @@ Local database with metadata of every file, database can be also automatically
 saved to S3.
 Query to database for file searching.
 
+- Install
+sudo gem install niky81-s3rbackup -s http://gems.github.com
+
 - Configure
 You need a file called ~/.s3rbackup/config.yml in your home directory with:
 
