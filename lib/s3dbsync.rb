@@ -20,6 +20,7 @@ class S3SyncDb
 			#download db
 			begin
 				buck_db = Bucket.find(config["bucket_db"])
+			  db_file = S3Object.find('s3rbackup_yaml_db', config["bucket_db"])
 			rescue
 				#devo crearlo
 				if config["sync_db"]
@@ -30,7 +31,6 @@ class S3SyncDb
 				return
 			end
 			#lo copio in locale
-		  db_file = S3Object.find('s3rbackup_yaml_db', config["bucket_db"])
 			open(@db_file, 'w') do |file|
 				S3Object.stream('s3rbackup_yaml_db', config["bucket_db"]) do |chunk|
 					file.write chunk
