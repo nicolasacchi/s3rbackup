@@ -1,0 +1,18 @@
+-
+  bucket: nik_test_bak
+  sync_db: true
+  access_key_id: XXXXXXXXXXXXXXXX
+  secret_access_key: xxxxxxxxxxxxxxxxxxxxxx
+  bucket_db: s3rbackup_nik
+  bucket_log: s3rbackup_nik_log
+  log: true
+  db_file: nik_backup.yml
+-
+  bucket: second_bak
+  sync_db: true
+  access_key_id: xxxxxxxxxxxxxxxxx
+  secret_access_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  bucket_db: second_db
+  bucket_log: second_log
+  log: true
+  db_file: seconddb.yml
