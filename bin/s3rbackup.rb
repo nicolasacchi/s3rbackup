@@ -3,9 +3,11 @@
 require 'rubygems'
 require 'optparse'
 
-# always look "here" for include files (thanks aktxyz)
-$LOAD_PATH << File.expand_path(File.dirname(__FILE__)) 
-require '../lib/s3dbsync'
+development_lib = File.join(File.dirname(__FILE__), '..', 'lib')
+if File.exists? development_lib + '/s3dbsync.rb'
+  $LOAD_PATH.unshift(development_lib).uniq!
+end
+require 's3dbsync'
 
 
 class OptS3rbackup
@@ -46,6 +48,10 @@ class OptS3rbackup
 				options[:bucket_log] = name
 			end
 
+			opts.on("-u", "--config-number NUM", Integer, "Number of config to use if nil use first") do |name|
+				options[:config_num] = name
+			end
+
 			opts.on_tail("-h", "--help", "Show this message") do
 				puts opts
 				exit
@@ -61,7 +67,7 @@ options = OptS3rbackup.parse(ARGV)
 #in argv rimane tutto il resto
 #p ARGV
 
-config = Configure.new(options[:file_cfg])
+config = Configure.new(options[:file_cfg], options[:config_num])
 config.current["bucket"] = options[:bucket] if options[:bucket]
 config.current["log"] = options[:log] if options[:log] != nil
 config.current["bucket_log"] = options[:bucket_log] if options[:bucket_log]

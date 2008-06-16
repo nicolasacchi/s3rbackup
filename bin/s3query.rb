@@ -3,9 +3,13 @@
 require 'rubygems'
 require 'optparse'
 
+development_lib = File.join(File.dirname(__FILE__), '..', 'lib')
+if File.exists? development_lib + '/s3dbsync.rb'
+  $LOAD_PATH.unshift(development_lib).uniq!
+end
 # always look "here" for include files (thanks aktxyz)
-$LOAD_PATH << File.expand_path(File.dirname(__FILE__)) 
-require '../lib/s3dbsync'
+#$LOAD_PATH << File.expand_path(File.dirname(__FILE__)) 
+require 's3dbsync'
 
 
 class OptS3rquery
@@ -81,6 +85,10 @@ class OptS3rquery
 			opts.on("--bucket-log", String, "Bucket log NAME") do |name|
 				options[:bucket_log] = name
 			end
+
+			opts.on("-u", "--config-number NUM", Integer, "Number of config to use if nil use first") do |name|
+				options[:config_num] = name
+			end
 	
 			opts.on_tail("-h", "--help", "Show this message") do
 				puts opts
@@ -106,7 +114,7 @@ end
 
 options = OptS3rquery.parse(ARGV)
 
-config = Configure.new(options[:file_cfg])
+config = Configure.new(options[:file_cfg], options[:config_num])
 config.current["bucket"] = options[:bucket] if options[:bucket]
 
 s3db = S3SyncDb.new(config.current)

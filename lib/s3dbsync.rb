@@ -12,7 +12,7 @@ class S3SyncDb
 			    			:secret_access_key => config["secret_access_key"])
 
 		@config = config
-		@db_file = config["db_file"]
+		@db_file = "#{ENV['HOME']}/.s3rbackup/#{config['db_file']}"
 		@db_file = "#{ENV['HOME']}/.s3rbackup/s3db.yml" if !@db_file
 		@db_file_ver = "#{@db_file}.ver"
 		#apro il db
@@ -312,8 +312,12 @@ end
 
 class Configure
 	attr_reader :current
-	def initialize(file_name = "#{ENV['HOME']}/.s3rbackup/config.yml")
+	def initialize(file_name = "#{ENV['HOME']}/.s3rbackup/config.yml", config_num = nil)
+		config_num = 0 if config_num == nil
 		file_name = "#{ENV['HOME']}/.s3rbackup/config.yml" if !file_name
 		@current = YAML::load(File.open(file_name))
+		if @current.class.to_s == "Array"
+			@current = @current[config_num]
+		end
 	end
 end
