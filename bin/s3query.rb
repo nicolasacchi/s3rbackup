@@ -5,7 +5,7 @@ require 'optparse'
 
 # always look "here" for include files (thanks aktxyz)
 $LOAD_PATH << File.expand_path(File.dirname(__FILE__)) 
-require 's3dbsync'
+require '../lib/s3dbsync'
 
 
 class OptS3rquery
