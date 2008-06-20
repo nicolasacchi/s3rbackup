@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = "s3rbackup"
-  s.version = "0.2.4"
-  s.date = "2008-06-16"
+  s.version = "0.2.6"
+  s.date = "2008-06-20"
   s.summary = "Simple backup on Amazon S3"
   s.email = "sacchi.nicola@gmail.com"
   s.homepage = "http://github.com/niky81/s3rbackup"

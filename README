@@ -8,6 +8,7 @@ It's a backup system based on amazon s3 backend.
 saved and retrived from S3.
 * Query to database for file searching.
 * Multiple database at one time
+* Multiple compression type (see doc/stats.txt for speed results) selectable from config or command line
 
 - Install
 sudo gem install niky81-s3rbackup -s http://gems.github.com

@@ -44,8 +44,12 @@ class OptS3rbackup
 				options[:log] = false
 			end
 
-			opts.on("--bucket-log", String, "Bucket log NAME") do |name|
+			opts.on("--bucket-log NAME", String, "Bucket log NAME") do |name|
 				options[:bucket_log] = name
+			end
+
+			opts.on("-p", "--compression [bz2|lzma|7z|gz]", String, "Compression type (always at maximum compression)") do |name|
+				options[:compression] = name
 			end
 
 			opts.on("-u", "--config-number NUM", Integer, "Number of config to use if nil use first") do |name|
@@ -71,6 +75,7 @@ config = Configure.new(options[:file_cfg], options[:config_num])
 config.current["bucket"] = options[:bucket] if options[:bucket]
 config.current["log"] = options[:log] if options[:log] != nil
 config.current["bucket_log"] = options[:bucket_log] if options[:bucket_log]
+config.current["compression"] = options[:compression] if options[:compression]
 s3db = S3SyncDb.new(config.current)
 s3db.bak(ARGV,  options[:name],  options[:descr])
 s3db.salva_db

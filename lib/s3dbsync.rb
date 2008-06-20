@@ -123,7 +123,21 @@ class S3SyncDb
 		name = dirs[0] if !name
 		tf = Tempfile.new("s3rbackup")
 		tf_l = Tempfile.new("s3rbackup-listfile")
-		tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | bzip2 -9 > #{tf.path}`
+		case @config["compression"]
+			when '7z'
+				tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | 7z a -t7z -m0=lzma -mx=9 -mfb=64 -md=32m -ms=on -si  #{tf.path}.7z`
+				file_path = "#{tf.path}.7z"
+			when 'lzma'
+				tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | lzma -9 > #{tf.path}`
+				file_path = tf.path
+			when 'gz'
+				tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | gzip -9 > #{tf.path}`
+				file_path = tf.path
+			else
+				tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | bzip2 -9 > #{tf.path}`
+				file_path = tf.path
+		end
+		#FIXME delete file_path
 
 		filez = []
 		File.open(tf_l.path, 'r').each_line do |fh|
@@ -138,8 +152,8 @@ class S3SyncDb
 		doc["description"] = descr
 		doc["host"] = `hostname`.gsub("\n","").to_s
 		doc["user"] = `whoami`.gsub("\n","").to_s
-		doc["size"] = File.size(tf.path)
-		doc["compression"] = "bz2"
+		doc["size"] = File.size(file_path)
+		doc["compression"] = @config["compression"]
 		doc["archive"] = "tar"
 		doc["files"] = filez.join("")
 		@db << doc
@@ -164,7 +178,7 @@ class S3SyncDb
 	#         options["x-amz-meta-mtime"] = fstat.mtime.getutc.to_i if @save_time
 	#           options["x-amz-meta-size"] = fstat.size if @save_size
 
-		store = S3Object.store(aws_name, open(tf.path), @config["bucket"], options)
+		store = S3Object.store(aws_name, open(file_path), @config["bucket"], options)
 		obj = S3Object.find(aws_name, @config["bucket"])
 		#obj.store
 		obj.about.each do |key,val|
@@ -286,7 +300,7 @@ class S3SyncDb
 	def unpack(item, out_name = nil)
 		aws_name = item["aws_name"]
 		bucket = item["bucket"]
-		tf = Tempfile.new("s3runbackup")
+		tf = Tempfile.new("s3runbackup.#{item['archive']}.#{item['compression']}")
 		open(tf.path, 'w') do |file|
 			S3Object.stream(aws_name, bucket) do |chunk|
 				file.write chunk
@@ -294,10 +308,20 @@ class S3SyncDb
 		end
 		if out_name
 			`mkdir -p #{out_name}`
-			tar = `tar --directory #{out_name} -xjf #{tf.path}`
+			out_tar = "--directory #{out_name}"
 		else
-			tar = `tar xfj #{tf.path}`
+			out_tar = ""
 		end
+		case item["compression"]
+			when '7z'
+				tar = `7za x -so #{tf.path} | tar #{out_tar} -xf -`
+			when 'lzma'
+				tar = `cat #{tf.path} | lzma -d -c | tar #{out_tar} xf -`
+			when 'gz'
+				tar = `tar #{out_tar} -xzf #{tf.path}`
+			when 'bz2'
+				tar = `tar #{out_tar} -xjf #{tf.path}`
+			end
 	end
 
 	def delete(item)
@@ -318,6 +342,9 @@ class Configure
 		@current = YAML::load(File.open(file_name))
 		if @current.class.to_s == "Array"
 			@current = @current[config_num]
+		end
+		if !@current["compression"] 
+			@current["compression"] = "bz2"
 		end
 	end
 end
