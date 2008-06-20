@@ -1,0 +1,22 @@
+ADSL upload speed: 512kbit
+Total uncompressed: 76M
+
+bz2 - 34.17Mb
+real    16m53.916s
+user    0m42.259s
+sys     0m1.796s
+
+7z 19.88Mb
+real    7m4.099s
+user    1m0.804s
+sys     0m1.596s
+
+lzma 19.86Mb
+real    7m57.157s
+user    1m39.718s
+sys     0m1.792s
+
+gz 35.81Mb
+real    13m5.371s
+user    0m11.633s
+sys     0m1.260s
