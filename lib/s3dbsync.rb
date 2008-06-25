@@ -157,7 +157,7 @@ class S3SyncDb
 		doc["archive"] = "tar"
 		doc["files"] = filez.join("")
 		@db << doc
-		aws_name = "#{doc["name"]}_#{`date +%Y%m%d_%H.%M.%S`}_#{@db.find_index(doc)}".gsub("\n","")
+		aws_name = "#{doc["name"]}_#{`date +%Y%m%d_%H.%M.%S`}_#{@db.index(doc)}".gsub("\n","")
 		doc["aws_name"] = aws_name
 		#FIXME Controllare che in db venga salvato aws_name
 
