@@ -249,6 +249,19 @@ class S3SyncDb
 					results << item
 				end
 			end
+			#results.sort!
+			and_results = []
+			if results.nitems > 0
+				prev = results[0]
+				results.each do |res|
+					test = results.select {|t| t == res}
+					#test = results.select {|t| t["aws_name"] == res["aws_name"]}
+					if words.nitems == test.nitems
+						and_results << res
+					end
+				end
+			end
+			results = and_results
 		end
 		#caso in cui voglio tutto
 		if words.nitems == 0
@@ -276,7 +289,7 @@ class S3SyncDb
 				results << val[0] if cmd_opt[:older]
 			end
 		end
-		results.sort! {|x,y| x["date"] <=> y["date"]}
+		results.sort! {|x,y| x["datetime"] <=> y["datetime"]}
 
 		return results
 	end

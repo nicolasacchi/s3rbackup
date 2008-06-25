@@ -50,6 +50,8 @@ To search file only by name on database:
 	s3query.rb search name=test
 To search only file bigger than 1Mb on database:
 	s3query.rb search size>1000000
+To search by date
+	s3query.rb search "datetime<2008/06/25_22:10"
 to get all file that match name=test:
 	s3query.rb get name=test
 to get and extract all file that match name=test
