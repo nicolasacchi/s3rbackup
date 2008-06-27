@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = "s3rbackup"
-  s.version = "0.2.8"
-  s.date = "2008-06-25"
+  s.version = "0.2.9"
+  s.date = "2008-06-27"
   s.summary = "Simple backup on Amazon S3"
   s.email = "sacchi.nicola@gmail.com"
   s.homepage = "http://github.com/niky81/s3rbackup"
@@ -9,6 +9,8 @@ Gem::Specification.new do |s|
   s.has_rdoc = false
   s.authors = ["Nicola Sacchi"]
   s.files = ["LICENSE", "README" , "lib/s3dbsync.rb", "bin/s3query.rb", "bin/s3rbackup.rb"]
+	s.executables << "s3query.rb"
+	s.executables << "s3rbackup.rb"
   s.test_files = []
   s.add_dependency("aws-s3", ["> 0.0.0"])
   s.add_dependency("OptionParser", ["> 0.0.0"])
