@@ -2,6 +2,8 @@ require 'rubygems'
 require 'aws/s3'
 require 'tempfile'
 require 'yaml'
+#nuovo aws
+require 'right_aws'
 
 class S3SyncDb
 	include AWS::S3
@@ -10,94 +12,20 @@ class S3SyncDb
 		@conn = AWS::S3::Base.establish_connection!(
 	    					:access_key_id     => config["access_key_id"],
 			    			:secret_access_key => config["secret_access_key"])
+		@sdb = RightAws::SdbInterface.new(config["access_key_id"], config["secret_access_key"], 
+															{:multi_thread => true, :logger => Logger.new('/tmp/x.log')})
+		@s3 =  RightAws::S3.new(config["access_key_id"], config["secret_access_key"])
 
 		@config = config
-		@db_file = "#{ENV['HOME']}/.s3rbackup/#{config['db_file']}"
-		@db_file = "#{ENV['HOME']}/.s3rbackup/s3db.yml" if !@db_file
-		@db_file_ver = "#{@db_file}.ver"
-		#apro il db
-		if !File.exists?(@db_file)
-			#download db
-			begin
-				buck_db = Bucket.find(config["bucket_db"])
-			  db_file = S3Object.find('s3rbackup_yaml_db', config["bucket_db"])
-			rescue
-				#devo crearlo
-				if config["sync_db"]
-					Bucket.create(config["bucket_db"])
-				end
-				@db = []
-				@version = 0
-				return
-			end
-			#lo copio in locale
-			open(@db_file, 'w') do |file|
-				S3Object.stream('s3rbackup_yaml_db', config["bucket_db"]) do |chunk|
-					file.write chunk
-		    end
-		  end
-			@version = db_file.metadata[:version].to_i
-			File.open(@db_file_ver, 'w') { |f| f.puts @version.to_s }
-		elsif config["sync_db"]
-			begin
-				buck_db = Bucket.find(config["bucket_db"])
-				db_file = S3Object.find('s3rbackup_yaml_db', config["bucket_db"])
-			rescue
-				#devo crearlo
-				if config["sync_db"]
-					Bucket.create(config["bucket_db"])
-				end
-				@db = YAML::load(File.open(@db_file))
-				@version ||= File.read(@db_file_ver).to_i
-				return
-			end
-			#se esiste e devo fare il sync
-			@version = db_file.metadata[:version].to_i
-			local_ver = File.read(@db_file_ver)
-			if @version > local_ver.to_i
-				#uso il remoto
-				open(@db_file, 'w') do |file|
-					db_file.stream do |chunk|
-						file.write chunk
-			    end
-			  end
-				File.open(@db_file_ver, 'w') { |f| f.puts @version.to_s }
-			else
-				#posso usare quello locale
-			end
-		end
-		#lo carico
-		@db = YAML::load(File.open(@db_file))
-		@version ||= File.read(@db_file_ver).to_i
+		#d'ora in poi uso il db su aws
+		@domain_db = config['bucket']
+		@bucket = config['bucket']
 	end
 
-	def salva_locale
-		File.open(@db_file, 'w') { |f| f.puts @db.to_yaml }
-	end
-
-	def nuova_versione
-		@version += 1
-		File.open(@db_file_ver, 'w') { |f| f.puts @version.to_s }
-	end
-
-	def aggiornaS3
-		salva_locale()
-		S3Object.store("s3rbackup_yaml_db", open(@db_file, "r"), @config["bucket_db"])
-		db_file = S3Object.find('s3rbackup_yaml_db', @config["bucket_db"])
-		db_file.metadata[:version] = @version.to_s
-		db_file.store
-	end
-
-	def salva_db
-		salva_locale()
-		nuova_versione()
-		aggiornaS3() if @config["sync_db"]
-	end
-
-	def crea_bucket()
-		#find bucket
-		@bucket = @config["bucket"]
-		@bucket_log = @config["bucket_log"] ? @config["bucket_log"] : "#{@bucket}-logs"
+	def initialize_db
+		puts "Creating #{@domain_db} db..."
+		@sdb.create_domain(@domain_db) 
+		puts "Creating #{@bucket} bucket..."
 		begin
 			bbackup = Bucket.find(@bucket)
 		rescue
@@ -105,21 +33,24 @@ class S3SyncDb
 				raise "Can't create bucket:#{@bucket}"
 			end
 		end
-		if @config["log"]
-			begin
-				blog = Bucket.find(@bucket_log)
-			rescue
-				Bucket.create(@bucket_log)
-			end
-			Bucket.enable_logging_for(
-				@bucket, 'target_bucket' => @bucket_log)
-		else
-			Bucket.disable_logging_for(@bucket) 
-		end
-	end	
+	end
 
+	def destroy_db
+		puts "Deleting bucket #{@bucket}..."
+		bucket1 = @s3.bucket(@bucket)
+		bucket1.delete(true)
+		puts "Deleting db #{@domain_db}..."
+		@sdb.delete_domain(@domain_db)
+	end
+
+	def test
+		#buk = @s3.buckets
+		buk = @s3.buckets.map{|b| b.name}
+ 		puts "Buckets on S3: #{buk.join(', ')}"
+	end
+
+	#s3 sdb
 	def bak(dirs, name, descr)
-		crea_bucket()
 		name = dirs[0] if !name
 		tf = Tempfile.new("s3rbackup")
 		tf_l = Tempfile.new("s3rbackup-listfile")
@@ -155,15 +86,15 @@ class S3SyncDb
 		doc["size"] = File.size(file_path)
 		doc["compression"] = @config["compression"]
 		doc["archive"] = "tar"
-		doc["files"] = filez.join("")
-		@db << doc
-		aws_name = "#{doc["name"]}_#{`date +%Y%m%d_%H.%M.%S`}_#{@db.index(doc)}".gsub("\n","")
+		#doc["files"] = filez.join("")
+		#@db << doc
+		aws_name = "#{doc["name"]}##{`date +%Y%m%d_%H.%M.%S`}".gsub("\n","")
 		doc["aws_name"] = aws_name
-		#FIXME Controllare che in db venga salvato aws_name
+		@sdb.put_attributes @domain_db, aws_name, doc
+		#TODO aggiungere md5
 
   # Store it!
 		options = {}
-		#options[:access] = :public_read if @public
 		options["x-amz-meta-host"] = doc["host"]
 		options["x-amz-meta-user"] = doc["user"]
 		options["x-amz-meta-descrizione"] = doc["description"]
@@ -171,12 +102,6 @@ class S3SyncDb
 		options["x-amz-meta-size"] = doc["size"]
 		options["x-amz-meta-compression"] = doc["compression"]
 		options["x-amz-meta-archive"] = doc["archive"]
-		#options["x-amz-meta-files"] = doc["files"]
-
-
-	#       options["x-amz-meta-sha1_hash"] = `sha1sum #{file}`.split[0] if @save_hash
-	#         options["x-amz-meta-mtime"] = fstat.mtime.getutc.to_i if @save_time
-	#           options["x-amz-meta-size"] = fstat.size if @save_size
 
 		store = S3Object.store(aws_name, open(file_path), @config["bucket"], options)
 		obj = S3Object.find(aws_name, @config["bucket"])
@@ -185,7 +110,6 @@ class S3SyncDb
 			doc[key] = val
 		end
 		#TODO aggiungere check
-		#TODO aggiornare db
 	end
 
 	def find(words, bucket = nil, cmd_opt = {})
@@ -197,99 +121,56 @@ class S3SyncDb
 					#opzione
 					option["="] ||= {}
 					option["="][word.split("=")[0]] = word.split("=")[1]
+					words_search << word
 				when /.*>.*/
 					#opzione
 					option[">"] ||= {}
 					option[">"][word.split(">")[0]] = word.split(">")[1]
+					words_search << word
 				when /.*<.*/
 					#opzione
 					option["<"] ||= {}
 					option["<"][word.split("<")[0]] = word.split("<")[1]
-				else
 					words_search << word
+				else
+					words_search << "'#{word}'"
 			end
+		end
+		if words_search.nitems == 1
+			#ho solo una parola uso startwith sul nome
+			search = "['aws_name' starts-with #{words_search[0]}]"
+		else
+			search = "[#{words_search.join(" ")}]"
 		end
 		results = []
-		@db.each do |item|
-			option.each do |key,opts|
-				opts.each do |campo,val|
-					case key
-						when "="
-							case item[campo].class.to_s
-								when "Time"
-									results << item if item[campo] = Time.parse(val) 
-								when "Fixnum"
-									results << item if item[campo] = val.to_i
-								else
-									results << item if item[campo] =~ /.*#{val}.*/
-							end
-						when "<"
-							case item[campo].class.to_s
-								when "Time"
-									results << item if item[campo] < Time.parse(val) 
-								when "Fixnum"
-									results << item if item[campo] < val.to_i
-								else
-									results << item if item[campo] < val
-							end
-						when ">"
-							case item[campo].class.to_s
-								when "Time"
-									results << item if item[campo] > Time.parse(val) 
-								when "Fixnum"
-									results << item if item[campo] > val.to_i
-								else
-									results << item if item[campo] > val
-							end
-					end
-				end
-			end
-			words_search.each do |word|
-				if item.values.join(" ") =~ /.*#{word}.*/
-					results << item
-				end
-			end
-			#results.sort!
-			and_results = []
-			if results.nitems > 0
-				prev = results[0]
-				results.each do |res|
-					test = results.select {|t| t == res}
-					#test = results.select {|t| t["aws_name"] == res["aws_name"]}
-					if words.nitems == test.nitems
-						and_results << res
-					end
-				end
-			end
-			results = and_results
-		end
-		#caso in cui voglio tutto
-		if words.nitems == 0
-			@db.each do |item|
-				results << item
+		@sdb.query(@domain_db, search) do |result|
+			result[:items].each do |item|
+				results << @sdb.get_attributes(@domain_db, item)[:attributes]
 			end
 		end
-		results.uniq!
-		hres = {}
-		if cmd_opt[:newer] or cmd_opt[:older]
-			results.each do |item|
-				results.each do |item2|
-					if item["name"] == item2["name"]
-						hres[item["name"]] ||= []
-						hres[item["name"]] << item
-						#hres[:name].sort! {|x,y| x["date"] <=> y["date"]}
-					end
-				end
-			end
-			results = []
-			#p hres
-			hres.each do |key,val|
-				val.sort! {|x,y| x["date"] <=> y["date"]}
-				results << val[val.nitems - 1] if cmd_opt[:newer]
-				results << val[0] if cmd_opt[:older]
-			end
-		end
-		results.sort! {|x,y| x["datetime"] <=> y["datetime"]}
+		#results_aws[:items].each do |item|
+		#end
+		#p results
+#		hres = {}
+#		if cmd_opt[:newer] or cmd_opt[:older]
+#			results.each do |item|
+#				results.each do |item2|
+#					if item["name"] == item2["name"]
+#						hres[item["name"]] ||= []
+#						hres[item["name"]] << item
+#						#hres[:name].sort! {|x,y| x["date"] <=> y["date"]}
+#					end
+#				end
+#			end
+#			results = []
+#			#p hres
+#			hres.each do |key,val|
+#				val.sort! {|x,y| x["date"] <=> y["date"]}
+#				results << val[val.nitems - 1] if cmd_opt[:newer]
+#				results << val[0] if cmd_opt[:older]
+#			end
+#		end
+#		results.sort! {|x,y| x["datetime"] <=> y["datetime"]}
 
 		return results
 	end
@@ -340,10 +221,6 @@ class S3SyncDb
 	def delete(item)
 		S3Object.delete item["aws_name"], item["bucket"]
 		@db.delete(item)
-	end
-
-	def log()
-		return Bucket.logs(@config["bucket_log"])
 	end
 end
 

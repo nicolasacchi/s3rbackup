@@ -16,7 +16,7 @@ class OptS3rquery
 	def self.parse(args)
 		options = {}
 		opts = OptionParser.new do |opts|
-			opts.banner = "Usage: s3query.rb [options] <search|get|unpack|delete|stats|logs> <parameters> (parameters can be name=test or simply test)"
+			opts.banner = "Usage: s3query.rb [options] <search|get|unpack|delete|stats> <parameters> (parameters can be name=test or simply test)"
 		
 			opts.on("-s", "search words", String, "Search something") do |name|
 				options[:op] = "search"
@@ -74,22 +74,22 @@ class OptS3rquery
 				options[:first] = true
 			end
 	
-			opts.on("--log", "Log enabled") do |name|
-				options[:log] = true
-			end
-		
-			opts.on("--nolog", "Log disabled") do |name|
-				options[:log] = false
-			end
-
-			opts.on("--bucket-log", String, "Bucket log NAME") do |name|
-				options[:bucket_log] = name
-			end
-
 			opts.on("-u", "--config-number NUM", Integer, "Number of config to use if nil use first") do |name|
 				options[:config_num] = name
 			end
-	
+			
+			opts.on("--initialize", "Inizializza bucket and db") do |name|
+				options[:initialize] = true
+			end
+			
+			opts.on("--destroy", "Destroy bucket and db") do |name|
+				options[:destroy] = true
+			end
+
+			opts.on("--test", "Test something") do |name|
+				options[:test] = true
+			end
+
 			opts.on_tail("-h", "--help", "Show this message") do
 				puts opts
 				exit
@@ -125,8 +125,6 @@ case command
 		results = s3db.find(ARGV, nil, options)
 		results = get_last(results) if options[:last]
 		results = get_first(results) if options[:first]
-	when 'logs'
-		sub_cmd = ARGV.shift
 end
 case command
 	when 'search'
@@ -156,6 +154,7 @@ case command
 		end
 	when 'delete'
 		#cancella
+		p "DELETE"
 		results.each do |ret|
 			puts "Deleting of #{ret["aws_name"]}"
 			s3db.delete(ret)
@@ -177,17 +176,15 @@ case command
 				puts "#{key}:\t#{sprintf("%.2fMb", val / (1024.0 * 1024.0))}"
 			end
 		end
-	when 'logs'
-		case sub_cmd
-			when 'get'
-				logs = s3db.logs()
-				logs.each do |log|
-					p log
-				end
-			when 'delete'
-		end
-		#get logs bucket
 	else
-		puts "Some error occurred command #{command} not valid"
+		if options[:initialize]
+			s3db.initialize_db
+		elsif	options[:destroy]
+			s3db.destroy_db
+		elsif options[:test]
+			s3db.test
+		else
+			puts "Some error occurred command #{command} not valid"
+		end
 end
 

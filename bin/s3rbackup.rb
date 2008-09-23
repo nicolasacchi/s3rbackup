@@ -78,4 +78,4 @@ config.current["bucket_log"] = options[:bucket_log] if options[:bucket_log]
 config.current["compression"] = options[:compression] if options[:compression]
 s3db = S3SyncDb.new(config.current)
 s3db.bak(ARGV,  options[:name],  options[:descr])
-s3db.salva_db
+#s3db.salva_db
