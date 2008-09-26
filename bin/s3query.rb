@@ -154,12 +154,10 @@ case command
 		end
 	when 'delete'
 		#cancella
-		p "DELETE"
 		results.each do |ret|
 			puts "Deleting of #{ret["aws_name"]}"
 			s3db.delete(ret)
 		end
-		s3db.salva_db
 	when 'stats'
 		#get size
 		bucks_s = {}
@@ -170,7 +168,7 @@ case command
 		else
 			results.each do |ret|
 				bucks_s[ret["bucket"]] ||= 0
-				bucks_s[ret["bucket"]] += ret["size"]
+				bucks_s[ret["bucket"]] += ret["size"].to_i
 			end
 			bucks_s.each do |key,val|
 				puts "#{key}:\t#{sprintf("%.2fMb", val / (1024.0 * 1024.0))}"

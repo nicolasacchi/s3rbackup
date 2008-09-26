@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = "s3rbackup"
-  s.version = "0.2.9"
+  s.version = "0.3.0"
   s.date = "2008-06-27"
   s.summary = "Simple backup on Amazon S3"
   s.email = "sacchi.nicola@gmail.com"
@@ -13,5 +13,6 @@ Gem::Specification.new do |s|
 	s.executables << "s3rbackup.rb"
   s.test_files = []
   s.add_dependency("aws-s3", ["> 0.0.0"])
+  s.add_dependency("right_aws", ["> 0.0.0"])
   s.add_dependency("OptionParser", ["> 0.0.0"])
 end

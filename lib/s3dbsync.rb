@@ -4,6 +4,7 @@ require 'tempfile'
 require 'yaml'
 #nuovo aws
 require 'right_aws'
+require 'net/smtp'
 
 class S3SyncDb
 	include AWS::S3
@@ -13,8 +14,9 @@ class S3SyncDb
 	    					:access_key_id     => config["access_key_id"],
 			    			:secret_access_key => config["secret_access_key"])
 		@sdb = RightAws::SdbInterface.new(config["access_key_id"], config["secret_access_key"], 
-															{:multi_thread => true, :logger => Logger.new('/tmp/x.log')})
-		@s3 =  RightAws::S3.new(config["access_key_id"], config["secret_access_key"])
+															{:multi_thread => false, :logger => Logger.new('/tmp/sdb.log')})
+		@s3 =  RightAws::S3.new(config["access_key_id"], config["secret_access_key"], 
+															{:multi_thread => false, :logger => Logger.new('/tmp/s3.log')})
 
 		@config = config
 		#d'ora in poi uso il db su aws
@@ -78,9 +80,10 @@ class S3SyncDb
 		doc = {}
 		doc["name"] = name
 		doc["bucket"] = @config["bucket"]
-		doc["datetime"] = Time.now
+		doc["datetime"] = "'#{DateTime.now}'"
+		#doc["date"] = "#{DateTime.now.strftime("%Y%m%d")}"
 		doc["current_path"] = `pwd`.gsub("\n","").to_s
-		doc["description"] = descr
+		doc["description"] = descr ? descr : "n/a"
 		doc["host"] = `hostname`.gsub("\n","").to_s
 		doc["user"] = `whoami`.gsub("\n","").to_s
 		doc["size"] = File.size(file_path)
@@ -110,67 +113,59 @@ class S3SyncDb
 			doc[key] = val
 		end
 		#TODO aggiungere check
+		send_mail("S3rbackup - Saved #{doc["name"]}", (doc.to_a.map {|val| "#{val[0]}: #{val[1]}"}).join("\n") + "\n\nFiles:\n\t#{filez.join("\t")}")
 	end
 
 	def find(words, bucket = nil, cmd_opt = {})
 		option = {}
 		words_search = []
+		date = 0
 		words.each do |word|
+			date -= 1
 			case word 
 				when /.*=.*/
 					#opzione
-					option["="] ||= {}
-					option["="][word.split("=")[0]] = word.split("=")[1]
 					words_search << word
 				when /.*>.*/
 					#opzione
-					option[">"] ||= {}
-					option[">"][word.split(">")[0]] = word.split(">")[1]
 					words_search << word
 				when /.*<.*/
 					#opzione
-					option["<"] ||= {}
-					option["<"][word.split("<")[0]] = word.split("<")[1]
 					words_search << word
 				else
-					words_search << "'#{word}'"
+					if word == "datetime"
+						date = 2
+					end
+					if date == 0
+						#ci siamo uso i doppi apici
+						words_search << "'\\'#{word}\\''"
+					else
+						words_search << "'#{word}'"
+					end
 			end
 		end
 		if words_search.nitems == 1
 			#ho solo una parola uso startwith sul nome
-			search = "['aws_name' starts-with #{words_search[0]}]"
+			search = "['aws_name' starts-with #{words_search[0]}] union ['description' starts-with #{words_search[0]}]"
+		elsif words_search.nitems == 0
+			#devo caricare tutto
+			search = "['datetime' > '\\'1970\\'']"
 		else
 			search = "[#{words_search.join(" ")}]"
 		end
+		#p search
 		results = []
 		@sdb.query(@domain_db, search) do |result|
 			result[:items].each do |item|
-				results << @sdb.get_attributes(@domain_db, item)[:attributes]
+				hattr = @sdb.get_attributes(@domain_db, item)[:attributes]
+				hattr_ok = {}
+				hattr.each do |key,val|
+					hattr_ok[key] = val[0]
+				end
+				results << hattr_ok
 			end
 		end
-		#results_aws[:items].each do |item|
-		#end
-		#p results
-#		hres = {}
-#		if cmd_opt[:newer] or cmd_opt[:older]
-#			results.each do |item|
-#				results.each do |item2|
-#					if item["name"] == item2["name"]
-#						hres[item["name"]] ||= []
-#						hres[item["name"]] << item
-#						#hres[:name].sort! {|x,y| x["date"] <=> y["date"]}
-#					end
-#				end
-#			end
-#			results = []
-#			#p hres
-#			hres.each do |key,val|
-#				val.sort! {|x,y| x["date"] <=> y["date"]}
-#				results << val[val.nitems - 1] if cmd_opt[:newer]
-#				results << val[0] if cmd_opt[:older]
-#			end
-#		end
-#		results.sort! {|x,y| x["datetime"] <=> y["datetime"]}
+		results.sort! {|x,y| x["datetime"] <=> y["datetime"]}
 
 		return results
 	end
@@ -220,8 +215,20 @@ class S3SyncDb
 
 	def delete(item)
 		S3Object.delete item["aws_name"], item["bucket"]
-		@db.delete(item)
+		@sdb.delete_attributes(@domain_db, item["aws_name"])
 	end
+
+	def send_mail(subj, msg)
+		if(@config['mail_to'] and @config['mail_to'] != "")
+			msg = [ "Subject: #{subj}\n", "\n", "#{msg}\n" ]
+			Net::SMTP.start('localhost') do |smtp|
+				mail_to = @config['mail_to'].split(",").map {|t| t.strip} 
+			  ret = smtp.sendmail( msg,  @config['mail_from'], mail_to)
+			  #ret = smtp.sendmail( msg,  "nik@nikpad.ath.cx", ['sacchi.nicola@gmail.com'] )
+			end
+		end
+	end
+
 end
 
 class Configure
