@@ -26,7 +26,11 @@ class S3SyncDb
 
 	def initialize_db
 		puts "Creating #{@domain_db} db..."
-		@sdb.create_domain(@domain_db) 
+		@sdb.create_domain(@domain_db)
+		if @config['files_db']
+			puts "Creating file db #{@config['files_db']} db..."
+			@sdb.create_domain(@config['files_db'])
+		end
 		puts "Creating #{@bucket} bucket..."
 		begin
 			bbackup = Bucket.find(@bucket)
@@ -43,12 +47,16 @@ class S3SyncDb
 		bucket1.delete(true)
 		puts "Deleting db #{@domain_db}..."
 		@sdb.delete_domain(@domain_db)
+		if @config['files_db']
+			puts "Deleting file db #{@config['files_db']} db..."
+			@sdb.delete_domain(@config['files_db'])
+		end
 	end
 
 	def test
 		#buk = @s3.buckets
-		buk = @s3.buckets.map{|b| b.name}
- 		puts "Buckets on S3: #{buk.join(', ')}"
+		#buk = @s3.buckets.map{|b| b.name}
+ 		#puts "Buckets on S3: #{buk.join(', ')}"
 	end
 
 	#s3 sdb
@@ -89,13 +97,25 @@ class S3SyncDb
 		doc["size"] = File.size(file_path)
 		doc["compression"] = @config["compression"]
 		doc["archive"] = "tar"
-		#doc["files"] = filez.join("")
 		#@db << doc
 		aws_name = "#{doc["name"]}##{`date +%Y%m%d_%H.%M.%S`}".gsub("\n","")
 		doc["aws_name"] = aws_name
 		@sdb.put_attributes @domain_db, aws_name, doc
-		#TODO aggiungere md5
+		if @config['files_db']
+			#tutti in uno
+			filez_name = []
+			filez.each do |fil|
+				begin
+					filez_name << File.basename(fil.gsub("\n", ""))
+				rescue
+				end
+			end
+			@sdb.put_attributes @config['files_db'], aws_name, { 
+																:files_full => filez.map {|t| t.gsub("\n","")}, 
+																:files_name => filez_name}
+		end
 
+		#TODO aggiungere md5
   # Store it!
 		options = {}
 		options["x-amz-meta-host"] = doc["host"]
@@ -107,11 +127,11 @@ class S3SyncDb
 		options["x-amz-meta-archive"] = doc["archive"]
 
 		store = S3Object.store(aws_name, open(file_path), @config["bucket"], options)
-		obj = S3Object.find(aws_name, @config["bucket"])
+		#obj = S3Object.find(aws_name, @config["bucket"])
 		#obj.store
-		obj.about.each do |key,val|
-			doc[key] = val
-		end
+		#obj.about.each do |key,val|
+		#	doc[key] = val
+		#end
 		#TODO aggiungere check
 		send_mail("S3rbackup - Saved #{doc["name"]}", (doc.to_a.map {|val| "#{val[0]}: #{val[1]}"}).join("\n") + "\n\nFiles:\n\t#{filez.join("\t")}")
 	end
@@ -146,7 +166,12 @@ class S3SyncDb
 		end
 		if words_search.nitems == 1
 			#ho solo una parola uso startwith sul nome
-			search = "['aws_name' starts-with #{words_search[0]}] union ['description' starts-with #{words_search[0]}]"
+			if cmd_opt[:inside]
+				#cerco dentro ai file
+				search = "['files_full' starts-with #{words_search[0]}] union ['files_name' starts-with #{words_search[0]}]"
+			else
+				search = "['aws_name' starts-with #{words_search[0]}] union ['description' starts-with #{words_search[0]}]"
+			end
 		elsif words_search.nitems == 0
 			#devo caricare tutto
 			search = "['datetime' > '\\'1970\\'']"
@@ -155,12 +180,18 @@ class S3SyncDb
 		end
 		#p search
 		results = []
-		@sdb.query(@domain_db, search) do |result|
+		@sdb.query(cmd_opt[:inside] ? @config['files_db'] : @domain_db, search) do |result|
 			result[:items].each do |item|
 				hattr = @sdb.get_attributes(@domain_db, item)[:attributes]
 				hattr_ok = {}
 				hattr.each do |key,val|
 					hattr_ok[key] = val[0]
+					if cmd_opt[:files]
+						#per ogni file scrico la lista
+						hattr_ok_files ||= {}
+						hattr_ok_files[key] = @sdb.get_attributes(@config['files_db'], item)[:attributes]
+						p hattr_ok_files[key]	#FIXME vedere come visualizzarli...
+					end
 				end
 				results << hattr_ok
 			end

@@ -89,7 +89,15 @@ class OptS3rquery
 			opts.on("--test", "Test something") do |name|
 				options[:test] = true
 			end
-
+			
+			opts.on("--files", "Get files list") do |name|
+				options[:files] = true
+			end
+			
+			opts.on("--inside", "Search inside files, only start_with") do |name|
+				options[:inside] = true
+			end
+			
 			opts.on_tail("-h", "--help", "Show this message") do
 				puts opts
 				exit
