@@ -156,7 +156,7 @@ class S3SyncDb
 					words_search << word
 				when /.*union.*/
 					words_search << "] #{word} ["
-				when /.*INTERSECTION.*/
+				when /.*intersection.*/
 					words_search << "] #{word} ["
 				else
 					if word == "datetime"
