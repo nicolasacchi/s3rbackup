@@ -156,6 +156,8 @@ class S3SyncDb
 					words_search << word
 				when /.*union.*/
 					words_search << "] #{word} ["
+				when /.*INTERSECTION.*/
+					words_search << "] #{word} ["
 				else
 					if word == "datetime"
 						date = 2
@@ -182,7 +184,6 @@ class S3SyncDb
 		else
 			search = "[#{words_search.join(" ")}]"
 		end
-		p search
 		results = []
 		@sdb.query(cmd_opt[:inside] ? @config['files_db'] : @domain_db, search) do |result|
 			result[:items].each do |item|
