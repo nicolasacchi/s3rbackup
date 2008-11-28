@@ -40,6 +40,10 @@ class OptS3rbackup
 				options[:log] = true
 			end
 		
+			opts.on("--md5", "Check md5, upload only if md5 differ") do |name|
+				options[:md5_check] = true
+			end
+
 			opts.on("--nolog", "Log disabled") do |name|
 				options[:log] = false
 			end
@@ -77,5 +81,5 @@ config.current["log"] = options[:log] if options[:log] != nil
 config.current["bucket_log"] = options[:bucket_log] if options[:bucket_log]
 config.current["compression"] = options[:compression] if options[:compression]
 s3db = S3SyncDb.new(config.current)
-s3db.bak(ARGV,  options[:name],  options[:descr])
+s3db.bak(ARGV,  options[:name],  options[:descr], options[:md5_check])
 #s3db.salva_db

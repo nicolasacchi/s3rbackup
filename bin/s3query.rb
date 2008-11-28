@@ -16,7 +16,7 @@ class OptS3rquery
 	def self.parse(args)
 		options = {}
 		opts = OptionParser.new do |opts|
-			opts.banner = "Usage: s3query.rb [options] <search|get|unpack|delete|stats> <parameters> (parameters can be name=test or simply test)"
+			opts.banner = "Usage: s3query.rb [options] <search|get|unpack|delete|stats|delete_older> <parameters> (parameters can be name=test or simply test)"
 		
 			opts.on("-s", "search words", String, "Search something") do |name|
 				options[:op] = "search"
@@ -78,6 +78,10 @@ class OptS3rquery
 				options[:config_num] = name
 			end
 			
+			opts.on("-e", "--item-to-keep NUM", Integer, "Number of item to keep after deleting the olders (delete_older)") do |name|
+				options[:delete_older] = name
+			end
+			
 			opts.on("--initialize", "Inizializza bucket and db") do |name|
 				options[:initialize] = true
 			end
@@ -85,7 +89,7 @@ class OptS3rquery
 			opts.on("--destroy", "Destroy bucket and db") do |name|
 				options[:destroy] = true
 			end
-
+			
 			opts.on("--test", "Test something") do |name|
 				options[:test] = true
 			end
@@ -129,7 +133,7 @@ s3db = S3SyncDb.new(config.current)
 
 command = ARGV.shift
 case command
-	when /[search|get|unpack|delete|stats]/
+	when /[search|get|unpack|delete|stats|delete_older]/
 		results = s3db.find(ARGV, nil, options)
 		results = get_last(results) if options[:last]
 		results = get_first(results) if options[:first]
@@ -165,6 +169,27 @@ case command
 		results.each do |ret|
 			puts "Deleting of #{ret["aws_name"]}"
 			s3db.delete(ret)
+		end
+	when 'delete_older'
+		#cancella i piu' vecchi mantenendo options[:delete_older] item
+		# per ongi nome trovato
+		if options[:delete_older] == nil
+			options[:delete_older] = 2
+		end
+		group = {}
+		results.each do |ret|
+			group[ret["name"]] ||= []
+			group[ret["name"]] << ret
+		end
+		group.each do |key, arr_ret|
+			arr_ret.sort! {|x,y| x["datetime"] <=> y["datetime"] }
+			options[:delete_older].times do |num|
+				arr_ret.pop
+			end 
+			arr_ret.each do |ret|
+				puts "Deleting of #{ret["aws_name"]}"
+				s3db.delete(ret)
+			end
 		end
 	when 'stats'
 		#get size

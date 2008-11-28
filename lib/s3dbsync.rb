@@ -60,7 +60,7 @@ class S3SyncDb
 	end
 
 	#s3 sdb
-	def bak(dirs, name, descr)
+	def bak(dirs, name, descr, md5_check = false)
 		name = dirs[0] if !name
 		tf = Tempfile.new("s3rbackup")
 		tf_l = Tempfile.new("s3rbackup-listfile")
@@ -95,45 +95,58 @@ class S3SyncDb
 		doc["host"] = `hostname`.gsub("\n","").to_s
 		doc["user"] = `whoami`.gsub("\n","").to_s
 		doc["size"] = File.size(file_path)
+		doc["md5"] = `md5sum #{file_path} | cut -d " " -f 1`.gsub("\n", "")
 		doc["compression"] = @config["compression"]
 		doc["archive"] = "tar"
 		#@db << doc
 		aws_name = "#{doc["name"]}##{`date +%Y%m%d_%H.%M.%S`}".gsub("\n","")
 		doc["aws_name"] = aws_name
-		@sdb.put_attributes @domain_db, aws_name, doc
-		if @config['files_db']
-			#tutti in uno
-			filez_name = []
-			filez.each do |fil|
-				begin
-					filez_name << File.basename(fil.gsub("\n", ""))
-				rescue
+
+		carica = true
+		if md5_check
+			search = "['md5' = '#{doc["md5"]}']"
+			@sdb.query(@domain_db, search) do |result|
+				result[:items].each do |item|
+					hattr = @sdb.get_attributes(@domain_db, item)[:attributes]
+					if hattr["name"][0] == doc["name"]
+						carica = false
+					end
 				end
 			end
-			@sdb.put_attributes @config['files_db'], aws_name, { 
-																:files_full => filez.map {|t| t.gsub("\n","")}, 
-																:files_name => filez_name}
 		end
-
-		#TODO aggiungere md5
-  # Store it!
-		options = {}
-		options["x-amz-meta-host"] = doc["host"]
-		options["x-amz-meta-user"] = doc["user"]
-		options["x-amz-meta-descrizione"] = doc["description"]
-		options["x-amz-meta-current_path"] = doc["current_path"]
-		options["x-amz-meta-size"] = doc["size"]
-		options["x-amz-meta-compression"] = doc["compression"]
-		options["x-amz-meta-archive"] = doc["archive"]
-
-		store = S3Object.store(aws_name, open(file_path), @config["bucket"], options)
-		#obj = S3Object.find(aws_name, @config["bucket"])
-		#obj.store
-		#obj.about.each do |key,val|
-		#	doc[key] = val
-		#end
-		#TODO aggiungere check
-		send_mail("S3rbackup - Saved #{doc["name"]}", (doc.to_a.map {|val| "#{val[0]}: #{val[1]}"}).join("\n") + "\n\nFiles:\n\t#{filez.join("\t")}")
+		if carica 
+			@sdb.put_attributes @domain_db, aws_name, doc
+			if @config['files_db']
+				#tutti in uno
+				filez_name = []
+				filez.each do |fil|
+					begin
+						filez_name << File.basename(fil.gsub("\n", ""))
+					rescue
+					end
+				end
+				@sdb.put_attributes @config['files_db'], aws_name, { 
+																	:files_full => filez.map {|t| t.gsub("\n","")}, 
+																	:files_name => filez_name}
+			end
+	
+			#TODO aggiungere md5
+	  # Store it!
+			options = {}
+	#		options["x-amz-meta-host"] = doc["host"]
+	#		options["x-amz-meta-user"] = doc["user"]
+	#		options["x-amz-meta-descrizione"] = doc["description"]
+	#		options["x-amz-meta-current_path"] = doc["current_path"]
+	#		options["x-amz-meta-size"] = doc["size"]
+	#		options["x-amz-meta-compression"] = doc["compression"]
+	#		options["x-amz-meta-archive"] = doc["archive"]
+	
+			store = S3Object.store(aws_name, open(file_path), @config["bucket"], options)
+			#TODO aggiungere check
+			send_mail("S3rbackup - Saved #{doc["name"]}", (doc.to_a.map {|val| "#{val[0]}: #{val[1]}"}).join("\n") + "\n\nFiles:\n\t#{filez.join("\t")}")
+		else
+			send_mail("S3rbackup - Not Saved #{doc["name"]} - md5 already exist", (doc.to_a.map {|val| "#{val[0]}: #{val[1]}"}).join("\n") + "\n\nFiles:\n\t#{filez.join("\t")}")
+		end
 	end
 
 	def find(words, bucket = nil, cmd_opt = {})
