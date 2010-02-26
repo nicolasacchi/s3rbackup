@@ -52,7 +52,7 @@ class OptS3rbackup
 				options[:bucket_log] = name
 			end
 
-			opts.on("-p", "--compression [bz2|lzma|7z|gz]", String, "Compression type (always at maximum compression)") do |name|
+			opts.on("-p", "--compression [bz2|lzma|7z|gz|xz]", String, "Compression type (always at maximum compression)") do |name|
 				options[:compression] = name
 			end
 

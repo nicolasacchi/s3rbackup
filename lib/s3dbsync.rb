@@ -74,6 +74,9 @@ class S3SyncDb
 			when 'gz'
 				tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | gzip -9 > #{tf.path}`
 				file_path = tf.path
+			when 'xz'
+				tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | xz -9 > #{tf.path}`
+				file_path = tf.path
 			else
 				tar = `tar -cv #{dirs.join(" ")}  2>#{tf_l.path} | bzip2 -9 > #{tf.path}`
 				file_path = tf.path
@@ -257,6 +260,8 @@ class S3SyncDb
 				tar = `cat #{tf.path} | lzma -d -c | tar #{out_tar} xf -`
 			when 'gz'
 				tar = `tar #{out_tar} -xzf #{tf.path}`
+			when 'xz'
+				tar = `tar #{out_tar} -xJf #{tf.path}`
 			when 'bz2'
 				tar = `tar #{out_tar} -xjf #{tf.path}`
 			end
